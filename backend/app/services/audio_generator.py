@@ -160,10 +160,8 @@ class AudioGenerator:
         Generate audio for all transcripts in a batch.
         Returns path to the ZIP file containing all WAV files.
         """
-        audio_dir = artifacts_dir / job_id / "audio"
-        audio_dir.mkdir(parents=True, exist_ok=True)
-
         zip_path = artifacts_dir / f"{job_id}_audio.zip"
+        zip_path.parent.mkdir(parents=True, exist_ok=True)
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for i, transcript in enumerate(transcripts):

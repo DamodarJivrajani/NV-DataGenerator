@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Download, Loader2, CheckCircle, XCircle, Clock, FileJson, FileText, Table, 
-         Brain, Shield, BarChart2, Upload, Mic, Sparkles } from 'lucide-react'
+import { Download, Loader2, CheckCircle, XCircle, Clock, FileJson, FileText, Table,
+         Brain, Shield, BarChart2, Upload, Mic, Sparkles, Eye } from 'lucide-react'
 import { clsx } from 'clsx'
 import { api } from '@/services/api'
 import { useConfigStore } from '@/stores/configStore'
@@ -56,7 +57,10 @@ export function ExportPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const ext = format === 'csv' ? 'csv' : format === 'json' ? 'json' : 'jsonl'
+      // Map each export format to its real file extension. The blob object-URL
+      // overrides the server's Content-Disposition, so this must be correct.
+      const EXT: Record<string, string> = { csv: 'csv', json: 'json', audio: 'zip' }
+      const ext = EXT[format] ?? 'jsonl'
       a.download = `transcripts_${format}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
@@ -174,6 +178,21 @@ export function ExportPanel() {
 
           {isCompleted && (
             <>
+              {/* ── View generated transcripts (text + voice + KPIs) ── */}
+              <Link
+                to={`/transcripts/${job.id}`}
+                className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+              >
+                <Eye className="w-5 h-5" />
+                View Transcripts (text, voice & KPIs)
+              </Link>
+
+              {downloadMutation.isError && (
+                <p className="text-red-400 text-sm">
+                  {(downloadMutation.error as Error).message}
+                </p>
+              )}
+
               {/* ── Download ─────────────────────────────────────── */}
               <Section title="Download" icon={<Download className="w-4 h-4" />}>
                 <div className="grid grid-cols-3 gap-3">

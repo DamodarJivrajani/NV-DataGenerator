@@ -3,9 +3,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from data_designer.essentials import (
+from data_designer.config import (
     CategorySamplerParams,
-    DataDesigner,
     DataDesignerConfigBuilder,
     LLMStructuredColumnConfig,
     SamplerColumnConfig,
@@ -14,6 +13,7 @@ from data_designer.essentials import (
     UniformSamplerParams,
     UUIDSamplerParams,
 )
+from data_designer.interface.data_designer import DataDesigner
 from pydantic import BaseModel, Field
 
 from app.models import GenerationConfig, Transcript

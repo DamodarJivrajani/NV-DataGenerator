@@ -58,7 +58,14 @@ class HFUploader:
             tmp_path = Path(tmp_dir)
 
             # Write main data file
-            if dataset_format == "jsonl" or dataset_format == "sft":
+            if dataset_format == "sft":
+                from app.services.dataset_formats import build_sft_record
+                data_file = tmp_path / "data.jsonl"
+                with open(data_file, "w", encoding="utf-8") as f:
+                    for t in transcripts:
+                        f.write(json.dumps(build_sft_record(t)) + "\n")
+                hf_data_path = "data/train.jsonl"
+            elif dataset_format == "jsonl":
                 data_file = tmp_path / "data.jsonl"
                 with open(data_file, "w", encoding="utf-8") as f:
                     for t in transcripts:

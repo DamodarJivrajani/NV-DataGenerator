@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Clock, CheckCircle, XCircle, Loader2, Trash2, Download } from 'lucide-react'
-import { clsx } from 'clsx'
+import { Link } from 'react-router-dom'
+import { Clock, CheckCircle, XCircle, Loader2, Download, Eye } from 'lucide-react'
 import { api } from '@/services/api'
 import type { GenerationJob } from '@/types'
 
 export function JobHistory() {
-  const { data: jobs, isLoading, refetch } = useQuery({
+  const { data: jobs, isLoading } = useQuery({
     queryKey: ['jobs'],
     queryFn: api.listJobs,
     refetchInterval: 5000,
@@ -33,14 +33,14 @@ export function JobHistory() {
       <h3 className="text-lg font-semibold text-white">Recent Jobs</h3>
       <div className="space-y-2">
         {jobs.map((job) => (
-          <JobRow key={job.id} job={job} onRefresh={refetch} />
+          <JobRow key={job.id} job={job} />
         ))}
       </div>
     </div>
   )
 }
 
-function JobRow({ job, onRefresh }: { job: GenerationJob; onRefresh: () => void }) {
+function JobRow({ job }: { job: GenerationJob }) {
   const handleDownload = async (format: 'json' | 'csv' | 'jsonl') => {
     try {
       const blob = await api.downloadJob(job.id, format)
@@ -79,6 +79,14 @@ function JobRow({ job, onRefresh }: { job: GenerationJob; onRefresh: () => void 
         <div className="flex items-center gap-2">
           {job.status === 'completed' && (
             <div className="flex gap-1">
+              <Link
+                to={`/transcripts/${job.id}`}
+                className="flex items-center gap-1 px-2 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
+                title="View transcripts, KPIs & listen"
+              >
+                <Eye className="w-4 h-4" />
+                View
+              </Link>
               <button
                 onClick={() => handleDownload('json')}
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"

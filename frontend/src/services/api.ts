@@ -38,6 +38,10 @@ export const api = {
   getJob: (jobId: string): Promise<GenerationJob> =>
     fetchApi(`/jobs/${jobId}`),
 
+  // Get a job's generated transcripts for in-app viewing (text, voice, KPIs)
+  getJobResults: (jobId: string): Promise<{ transcripts: Transcript[] }> =>
+    fetchApi(`/jobs/${jobId}/results`),
+
   // List all jobs
   listJobs: (): Promise<GenerationJob[]> =>
     fetchApi('/jobs'),
@@ -49,7 +53,12 @@ export const api = {
   // Download generated data
   downloadJob: async (jobId: string, format: 'json' | 'csv' | 'jsonl' | 'sft' | 'sft_instruct' | 'curated' | 'audio' | 'dpo' = 'json'): Promise<Blob> => {
     const response = await fetch(`${API_URL}/jobs/${jobId}/download?format=${format}`)
-    if (!response.ok) throw new Error('Download failed')
+    if (!response.ok) {
+      // Surface the server's reason (e.g. background generation not finished yet)
+      // instead of a generic failure, since curated/audio/dpo are produced async.
+      const error = await response.json().catch(() => ({ detail: `Download failed (HTTP ${response.status})` }))
+      throw new Error(error.detail || `Download failed (HTTP ${response.status})`)
+    }
     return response.blob()
   },
 
@@ -79,7 +88,7 @@ export const api = {
   uploadToHF: (
     jobId: string,
     opts: { hf_token: string; repo_name: string; private: boolean; format: string }
-  ): Promise<{ repo_url: string; files_uploaded: number }> =>
+  ): Promise<{ repo_url: string; files_uploaded: string[] }> =>
     fetchApi(`/jobs/${jobId}/upload-hf`, {
       method: 'POST',
       body: JSON.stringify(opts),

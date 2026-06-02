@@ -5,6 +5,7 @@ import { ScenarioSelector } from './components/ScenarioSelector'
 import { ConfigOptions } from './components/ConfigOptions'
 import { TranscriptPreview } from './components/TranscriptPreview'
 import { ExportPanel } from './components/ExportPanel'
+import { TranscriptViewer } from './components/TranscriptViewer'
 import { useConfigStore } from './stores/configStore'
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 
@@ -118,6 +119,7 @@ export default function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<ConfigWizard />} />
+                <Route path="/transcripts/:jobId" element={<TranscriptViewer />} />
             </Routes>
         </BrowserRouter>
     )

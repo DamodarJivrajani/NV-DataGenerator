@@ -97,7 +97,6 @@ export function HFUploadModal({ jobId, onClose }: Props) {
               >
                 <option value="json">JSON</option>
                 <option value="jsonl">JSONL</option>
-                <option value="csv">CSV</option>
                 <option value="sft">SFT (prompt/response)</option>
               </select>
             </div>

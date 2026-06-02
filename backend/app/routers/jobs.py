@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 from app.services.job_store import job_store
+from app.services.dataset_formats import build_sft_record, build_sft_instruct_record
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -30,67 +31,26 @@ async def get_job(job_id: str):
     return job.model_dump(by_alias=True)
 
 
+@router.get("/{job_id}/results")
+async def get_job_results(job_id: str):
+    """Return a job's generated transcripts as a JSON body for in-app viewing.
+
+    Unlike /download (which sets Content-Disposition: attachment for file
+    downloads), this is a plain read endpoint the Transcript Viewer page uses to
+    render conversations, play audio, and compute KPIs client-side.
+    """
+    transcripts = job_store.get_results(job_id)
+    if not transcripts:
+        raise HTTPException(status_code=404, detail="Transcripts not available for this job yet")
+    return {"transcripts": transcripts}
+
+
 @router.delete("/{job_id}")
 async def delete_job(job_id: str):
     """Delete a job and its results."""
     if not job_store.delete_job(job_id):
         raise HTTPException(status_code=404, detail="Job not found")
     return {"message": "Job deleted"}
-
-
-def _build_sft_record(transcript: dict) -> dict:
-    """Convert transcript to SFT format: {prompt, response}."""
-    turns = transcript.get("conversation", [])
-    if not turns:
-        return {"prompt": "", "response": ""}
-
-    # Build prompt from all turns except last agent turn
-    prompt_parts = []
-    response = ""
-    last_agent_idx = None
-
-    for i, turn in enumerate(turns):
-        if turn.get("speaker") == "agent":
-            last_agent_idx = i
-
-    for i, turn in enumerate(turns):
-        speaker = turn.get("speaker", "agent")
-        text = turn.get("text", "")
-        if i == last_agent_idx:
-            response = text
-        else:
-            prompt_parts.append(f"[{speaker.upper()}]: {text}")
-
-    return {
-        "prompt": "\n".join(prompt_parts),
-        "response": response,
-        "metadata": {
-            "industry": transcript.get("industry"),
-            "scenario": transcript.get("scenario"),
-            "language": transcript.get("language", "english"),
-        },
-    }
-
-
-def _build_sft_instruct_record(transcript: dict) -> dict:
-    """Convert transcript to instruction-tuning SFT format."""
-    industry = transcript.get("industry", "")
-    scenario = transcript.get("scenario", "")
-    language = transcript.get("language", "english")
-    turns = transcript.get("conversation", [])
-
-    system_prompt = (
-        f"You are a professional contact center agent in the {industry} industry. "
-        f"You are handling a {scenario} scenario in {language}. "
-        f"Be helpful, empathetic, and resolve the customer's issue efficiently."
-    )
-
-    messages = [{"role": "system", "content": system_prompt}]
-    for turn in turns:
-        role = "assistant" if turn.get("speaker") == "agent" else "user"
-        messages.append({"role": role, "content": turn.get("text", "")})
-
-    return {"messages": messages}
 
 
 @router.get("/{job_id}/download")
@@ -186,7 +146,7 @@ async def download_job(job_id: str, format: str = "json"):
         )
     elif format == "sft":
         # Supervised Fine-Tuning format: {prompt, response}
-        sft_records = [_build_sft_record(t) for t in transcripts]
+        sft_records = [build_sft_record(t) for t in transcripts]
         lines = [json.dumps(r) for r in sft_records]
         content = "\n".join(lines)
         return StreamingResponse(
@@ -196,7 +156,7 @@ async def download_job(job_id: str, format: str = "json"):
         )
     elif format == "sft_instruct":
         # Chat instruction tuning format with messages array
-        sft_records = [_build_sft_instruct_record(t) for t in transcripts]
+        sft_records = [build_sft_instruct_record(t) for t in transcripts]
         lines = [json.dumps(r) for r in sft_records]
         content = "\n".join(lines)
         return StreamingResponse(
@@ -211,8 +171,13 @@ async def download_job(job_id: str, format: str = "json"):
 # ─── Quality Scoring ─────────────────────────────────────────────────────────
 
 @router.post("/{job_id}/score")
-async def score_job(job_id: str):
-    """Score all transcripts in a job using LLM quality judge."""
+def score_job(job_id: str):
+    """Score all transcripts in a job using LLM quality judge.
+
+    Defined as a sync handler so FastAPI runs it in a worker thread — the LLM
+    scoring makes sequential blocking HTTP calls and must not run on the event
+    loop, which would freeze all other requests (including status polling).
+    """
     transcripts = job_store.get_results(job_id)
     if not transcripts:
         raise HTTPException(status_code=404, detail="Job results not found")
@@ -235,7 +200,7 @@ async def score_job(job_id: str):
 # ─── Bias & Safety Report ────────────────────────────────────────────────────
 
 @router.get("/{job_id}/bias-report")
-async def get_bias_report(job_id: str):
+def get_bias_report(job_id: str):
     """Analyze transcripts for bias and safety issues."""
     transcripts = job_store.get_results(job_id)
     if not transcripts:
@@ -254,7 +219,7 @@ async def get_bias_report(job_id: str):
 # ─── Statistics ──────────────────────────────────────────────────────────────
 
 @router.get("/{job_id}/statistics")
-async def get_statistics(job_id: str):
+def get_statistics(job_id: str):
     """Compute dataset statistics for a completed job."""
     transcripts = job_store.get_results(job_id)
     if not transcripts:
@@ -279,7 +244,7 @@ class CurateRequest(BaseModel):
 
 
 @router.post("/{job_id}/curate")
-async def curate_job(job_id: str, request: CurateRequest):
+def curate_job(job_id: str, request: CurateRequest):
     """Run NeMo Curator-inspired curation pipeline on job transcripts."""
     transcripts = job_store.get_results(job_id)
     if not transcripts:
@@ -411,8 +376,13 @@ class HFUploadRequest(BaseModel):
 
 
 @router.post("/{job_id}/upload-hf")
-async def upload_to_hf(job_id: str, request: HFUploadRequest):
-    """Upload generated dataset to HuggingFace Hub."""
+def upload_to_hf(job_id: str, request: HFUploadRequest):
+    """Upload generated dataset to HuggingFace Hub.
+
+    Sync handler: the HuggingFace upload performs blocking network I/O
+    (create_repo, file writes, create_commit) that must run in a worker thread
+    rather than on the event loop.
+    """
     transcripts = job_store.get_results(job_id)
     if not transcripts:
         raise HTTPException(status_code=404, detail="Job results not found")
