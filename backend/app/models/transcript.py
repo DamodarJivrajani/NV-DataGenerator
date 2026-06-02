@@ -8,6 +8,61 @@ CallType = Literal["inbound", "outbound"]
 ResolutionStatus = Literal["resolved", "escalated", "pending", "unresolved"]
 ExperienceLevel = Literal["junior", "mid", "senior"]
 IssueComplexity = Literal["low", "medium", "high"]
+Language = Literal[
+    "english", "spanish", "french", "german", "portuguese",
+    "italian", "japanese", "mandarin", "hindi", "arabic",
+    "korean", "dutch", "russian"
+]
+
+
+class QualityScores(BaseModel):
+    coherence: float = Field(ge=0, le=10, description="Logical flow score 0-10")
+    diversity: float = Field(ge=0, le=10, description="Turn variety score 0-10")
+    factual_consistency: float = Field(alias="factualConsistency", ge=0, le=10, description="Factual accuracy score 0-10")
+    overall: float = Field(ge=0, le=10, description="Average quality score 0-10")
+
+    class Config:
+        populate_by_name = True
+
+
+class BiasReport(BaseModel):
+    gender_bias_score: float = Field(alias="genderBiasScore", ge=0, le=1, description="0=no bias, 1=high bias")
+    sentiment_distribution: dict = Field(alias="sentimentDistribution", default_factory=dict)
+    demographic_diversity_score: float = Field(alias="demographicDiversityScore", ge=0, le=1)
+    safety_flags: list[str] = Field(alias="safetyFlags", default_factory=list)
+    overall_fairness_grade: str = Field(alias="overallFairnessGrade", description="A/B/C/D/F")
+    total_analyzed: int = Field(alias="totalAnalyzed", default=0)
+
+    class Config:
+        populate_by_name = True
+
+
+class DatasetStats(BaseModel):
+    sentiment_distribution: dict = Field(alias="sentimentDistribution", default_factory=dict)
+    turn_length_histogram: list = Field(alias="turnLengthHistogram", default_factory=list)
+    industry_breakdown: dict = Field(alias="industryBreakdown", default_factory=dict)
+    scenario_breakdown: dict = Field(alias="scenarioBreakdown", default_factory=dict)
+    language_distribution: dict = Field(alias="languageDistribution", default_factory=dict)
+    resolution_status_distribution: dict = Field(alias="resolutionStatusDistribution", default_factory=dict)
+    csat_distribution: dict = Field(alias="csatDistribution", default_factory=dict)
+    quality_score_distribution: dict = Field(alias="qualityScoreDistribution", default_factory=dict)
+    avg_duration_seconds: float = Field(alias="avgDurationSeconds", default=0.0)
+    total_transcripts: int = Field(alias="totalTranscripts", default=0)
+
+    class Config:
+        populate_by_name = True
+
+
+class CurationResult(BaseModel):
+    original_count: int = Field(alias="originalCount")
+    deduplicated_count: int = Field(alias="deduplicatedCount")
+    pii_removed_count: int = Field(alias="piiRemovedCount")
+    quality_filtered_count: int = Field(alias="qualityFilteredCount")
+    final_count: int = Field(alias="finalCount")
+    curated_transcripts: list = Field(alias="curatedTranscripts", default_factory=list)
+
+    class Config:
+        populate_by_name = True
 
 
 class CustomerProfile(BaseModel):
@@ -57,6 +112,8 @@ class Transcript(BaseModel):
     conversation: list[ConversationTurn]
     metadata: TranscriptMetadata
     created_at: str = Field(alias="createdAt")
+    language: str = "english"
+    quality_scores: Optional[QualityScores] = Field(alias="qualityScores", default=None)
 
     class Config:
         populate_by_name = True
@@ -71,6 +128,7 @@ class GenerationConfig(BaseModel):
     min_turns: int = Field(alias="minTurns", default=4, ge=2)
     max_turns: int = Field(alias="maxTurns", default=12, le=30)
     include_metadata: bool = Field(alias="includeMetadata", default=True)
+    language: Language = "english"
 
     class Config:
         populate_by_name = True

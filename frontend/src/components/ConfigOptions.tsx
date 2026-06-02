@@ -1,17 +1,43 @@
 import { clsx } from 'clsx'
 import { Check, Phone, PhoneOutgoing, Minus, Plus } from 'lucide-react'
-import { sentiments, callTypes } from '../data/industries'
+import { sentiments, callTypes, languages } from '../data/industries'
 import { useConfigStore } from '../stores/configStore'
-import type { Sentiment, CallType } from '../types'
+import type { Sentiment, CallType, Language } from '../types'
 
 export function ConfigOptions() {
-    const { config, toggleCallType, toggleSentiment, setNumRecords, setTurnRange, setIncludeMetadata } = useConfigStore()
+    const { config, toggleCallType, toggleSentiment, setNumRecords, setTurnRange, setIncludeMetadata, setLanguage } = useConfigStore()
 
     return (
         <div className="space-y-8">
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">Configure Generation</h2>
                 <p className="text-gray-400">Fine-tune your synthetic transcript generation settings</p>
+            </div>
+
+            {/* Language Selection */}
+            <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-white">Output Language</h3>
+                <p className="text-sm text-gray-400">Generate all dialogue in the selected language</p>
+                <div className="flex flex-wrap gap-2">
+                    {languages.map((lang) => {
+                        const isSelected = config.language === lang.id
+                        return (
+                            <button
+                                key={lang.id}
+                                onClick={() => setLanguage(lang.id as Language)}
+                                className={clsx(
+                                    'px-3 py-2 rounded-lg border transition-all flex items-center gap-2 text-sm',
+                                    isSelected
+                                        ? 'bg-nvidia-green/10 border-nvidia-green text-nvidia-green'
+                                        : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                                )}
+                            >
+                                <span>{lang.flag}</span>
+                                <span>{lang.name}</span>
+                            </button>
+                        )
+                    })}
+                </div>
             </div>
 
             {/* Call Types */}

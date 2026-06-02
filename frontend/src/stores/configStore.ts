@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GenerationConfig, Sentiment, CallType } from '@/types'
+import type { GenerationConfig, Sentiment, CallType, Language } from '@/types'
 
 interface ConfigState {
   config: GenerationConfig
@@ -11,6 +11,7 @@ interface ConfigState {
   setNumRecords: (num: number) => void
   setTurnRange: (min: number, max: number) => void
   setIncludeMetadata: (include: boolean) => void
+  setLanguage: (language: Language) => void
   setStep: (step: number) => void
   nextStep: () => void
   prevStep: () => void
@@ -26,6 +27,7 @@ const defaultConfig: GenerationConfig = {
   minTurns: 4,
   maxTurns: 12,
   includeMetadata: true,
+  language: 'english',
 }
 
 export const useConfigStore = create<ConfigState>((set) => ({
@@ -80,6 +82,11 @@ export const useConfigStore = create<ConfigState>((set) => ({
   setIncludeMetadata: (includeMetadata) =>
     set((state) => ({
       config: { ...state.config, includeMetadata },
+    })),
+
+  setLanguage: (language) =>
+    set((state) => ({
+      config: { ...state.config, language },
     })),
 
   setStep: (step) => set({ step }),

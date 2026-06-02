@@ -42,6 +42,17 @@ INDUSTRY_SCENARIOS = {
     "telecom": ["outage", "plan_change", "billing", "tech_support", "activation"],
     "insurance": ["claims_filing", "policy_inquiry", "coverage", "premium", "renewal"],
     "travel": ["reservation", "cancellation", "complaint", "rewards", "special_request"],
+    "legal": ["consultation", "case_status", "document_request", "billing", "emergency"],
+    "education": ["enrollment", "financial_aid", "transcripts", "advising", "technical_support"],
+    "hr": ["application_status", "benefits", "payroll", "onboarding", "workplace_issue"],
+    "automotive": ["service_appointment", "recall", "warranty", "sales", "roadside"],
+    "real_estate": ["property_inquiry", "listing", "mortgage", "inspection", "closing"],
+    "government": ["benefits", "permits", "taxes", "dmv", "complaint"],
+    "energy": ["outage", "billing", "start_stop_service", "solar", "efficiency"],
+    "manufacturing": ["order_status", "quality_issue", "technical", "pricing", "supply_chain"],
+    "gaming": ["account_ban", "refund", "technical", "account_recovery", "billing"],
+    "logistics": ["tracking", "missing_delivery", "damage_claim", "pickup_scheduling", "customs"],
+    "saas": ["technical_bug", "integration", "billing", "onboarding", "account"],
 }
 
 SCENARIO_NAMES = {
@@ -73,6 +84,52 @@ SCENARIO_NAMES = {
     "cancellation": "Cancellations",
     "rewards": "Loyalty Rewards",
     "special_request": "Special Requests",
+    # New domains
+    "consultation": "Legal Consultation",
+    "case_status": "Case Status",
+    "document_request": "Document Request",
+    "emergency": "Legal Emergency",
+    "enrollment": "Enrollment",
+    "financial_aid": "Financial Aid",
+    "transcripts": "Academic Transcripts",
+    "advising": "Academic Advising",
+    "technical_support": "Technical Support",
+    "application_status": "Application Status",
+    "benefits": "Benefits",
+    "payroll": "Payroll",
+    "onboarding": "Onboarding",
+    "workplace_issue": "Workplace Issue",
+    "service_appointment": "Service Appointment",
+    "recall": "Safety Recall",
+    "warranty": "Warranty Claim",
+    "sales": "Vehicle Sales",
+    "roadside": "Roadside Assistance",
+    "property_inquiry": "Property Inquiry",
+    "listing": "Property Listing",
+    "mortgage": "Mortgage Inquiry",
+    "inspection": "Home Inspection",
+    "closing": "Closing Process",
+    "permits": "Permits & Licensing",
+    "taxes": "Tax Services",
+    "dmv": "DMV Services",
+    "start_stop_service": "Start/Stop Service",
+    "solar": "Solar Program",
+    "efficiency": "Energy Efficiency",
+    "quality_issue": "Quality Issue",
+    "technical": "Technical Inquiry",
+    "pricing": "Pricing & Quotes",
+    "supply_chain": "Supply Chain",
+    "account_ban": "Account Ban Appeal",
+    "refund": "Refund Request",
+    "account_recovery": "Account Recovery",
+    "tracking": "Shipment Tracking",
+    "missing_delivery": "Missing Delivery",
+    "damage_claim": "Damage Claim",
+    "pickup_scheduling": "Pickup Scheduling",
+    "customs": "Customs & International",
+    "technical_bug": "Technical Bug",
+    "integration": "API Integration",
+    "account": "Account Management",
 }
 
 
@@ -110,6 +167,13 @@ class TranscriptGenerator:
             name="call_type",
             sampler_type=SamplerType.CATEGORY,
             params=CategorySamplerParams(values=list(config.call_types)),
+        ))
+
+        # Language (fixed from config)
+        builder.add_column(SamplerColumnConfig(
+            name="language",
+            sampler_type=SamplerType.CATEGORY,
+            params=CategorySamplerParams(values=[config.language]),
         ))
 
         # Customer sentiment
@@ -220,6 +284,7 @@ Use domain terminology naturally in the conversation.
 
 Scenario: {{{{ scenario }}}}
 Call Type: {{{{ call_type }}}}
+Language: {{{{ language }}}}
 Customer: {{{{ customer_first_name }}}} {{{{ customer_last_name }}}}, age {{{{ customer_age }}}}
 Customer Sentiment: {{{{ customer_sentiment }}}}
 Issue Complexity: {{{{ issue_complexity }}}}
@@ -227,6 +292,12 @@ Agent: {{{{ agent_first_name }}}} {{{{ agent_last_name }}}}
 Agent Experience: {{{{ agent_experience }}}}
 Target conversation length: {{{{ num_turns }}}} turns
 {industry_context}
+MULTILINGUAL INSTRUCTIONS:
+- Generate the ENTIRE conversation in {{{{ language }}}}
+- ALL dialogue, greetings, and closings MUST be in {{{{ language }}}}
+- Use culturally appropriate names, idioms, and communication styles for {{{{ language }}}}
+- If language is not English, the conversation must be fully in that language (no English mixing)
+
 CONVERSATION GUIDELINES:
 1. Start with a professional greeting from the agent
 2. Customer explains their issue (tone matches their sentiment)
@@ -312,6 +383,7 @@ Return a JSON object with:
             id=row.get("transcript_id", str(uuid.uuid4())),
             industry=row.get("industry", config.industry),
             scenario=scenario,
+            language=row.get("language", config.language),
             callType=row.get("call_type", "inbound"),
             customer={
                 "name": f"{customer_first} {customer_last}",

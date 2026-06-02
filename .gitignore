@@ -107,5 +107,8 @@ backend/artifacts/
 backend/*.db
 *.db
 
+# Runtime artifacts (curated/audio/dpo outputs, generated transcripts)
+/artifacts/
+
 # DataDesigner
 DataDesigner/

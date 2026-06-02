@@ -10,6 +10,10 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
     "data-designer",
+    "huggingface_hub>=0.20.0",
+    "datasketch>=1.6.0",
+    "grpcio>=1.60.0",
+    "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]

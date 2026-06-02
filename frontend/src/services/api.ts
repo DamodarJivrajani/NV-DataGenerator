@@ -1,4 +1,4 @@
-import type { GenerationConfig, GenerationJob, Transcript } from '@/types'
+import type { GenerationConfig, GenerationJob, Transcript, BiasReport, DatasetStats, CurationResult } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
@@ -42,12 +42,56 @@ export const api = {
   listJobs: (): Promise<GenerationJob[]> =>
     fetchApi('/jobs'),
 
+  // Delete a job
+  deleteJob: (jobId: string): Promise<{ message: string }> =>
+    fetchApi(`/jobs/${jobId}`, { method: 'DELETE' }),
+
   // Download generated data
-  downloadJob: async (jobId: string, format: 'json' | 'csv' | 'jsonl' = 'json'): Promise<Blob> => {
+  downloadJob: async (jobId: string, format: 'json' | 'csv' | 'jsonl' | 'sft' | 'sft_instruct' | 'curated' | 'audio' | 'dpo' = 'json'): Promise<Blob> => {
     const response = await fetch(`${API_URL}/jobs/${jobId}/download?format=${format}`)
     if (!response.ok) throw new Error('Download failed')
     return response.blob()
   },
+
+  // Score transcripts using LLM quality judge
+  scoreJob: (jobId: string): Promise<{ message: string; job_id: string }> =>
+    fetchApi(`/jobs/${jobId}/score`, { method: 'POST' }),
+
+  // Get bias & safety report
+  getBiasReport: (jobId: string): Promise<BiasReport> =>
+    fetchApi(`/jobs/${jobId}/bias-report`),
+
+  // Get dataset statistics
+  getJobStatistics: (jobId: string): Promise<DatasetStats> =>
+    fetchApi(`/jobs/${jobId}/statistics`),
+
+  // Run NeMo Curator-inspired curation
+  curateJob: (
+    jobId: string,
+    opts: { min_quality_score: number; deduplicate: boolean; filter_pii: boolean }
+  ): Promise<CurationResult> =>
+    fetchApi(`/jobs/${jobId}/curate`, {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
+
+  // Upload to HuggingFace Hub
+  uploadToHF: (
+    jobId: string,
+    opts: { hf_token: string; repo_name: string; private: boolean; format: string }
+  ): Promise<{ repo_url: string; files_uploaded: number }> =>
+    fetchApi(`/jobs/${jobId}/upload-hf`, {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
+
+  // Generate DPO dataset
+  generateDPO: (jobId: string): Promise<{ message: string; job_id: string }> =>
+    fetchApi(`/jobs/${jobId}/generate-dpo`, { method: 'POST' }),
+
+  // Generate audio (Riva TTS)
+  generateAudio: (jobId: string): Promise<{ message: string; job_id: string; riva_available: boolean }> =>
+    fetchApi(`/jobs/${jobId}/generate-audio`, { method: 'POST' }),
 
   // Health check
   health: (): Promise<{ status: string }> =>
