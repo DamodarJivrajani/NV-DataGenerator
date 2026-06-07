@@ -47,8 +47,19 @@ def _concat_wav_bytes(wav_list: list[bytes]) -> bytes:
         buf = io.BytesIO(wav_data)
         try:
             with wave.open(buf, "rb") as wf:
+                seg_params = wf.getparams()
                 if params is None:
-                    params = wf.getparams()
+                    params = seg_params
+                # Concatenating raw frames only works if the audio format matches.
+                # A segment at a different channel count / sample width / sample
+                # rate would play back as garbled/chipmunk audio under the first
+                # segment's header, so skip mismatched segments instead.
+                elif seg_params[:3] != params[:3]:
+                    logger.warning(
+                        "Skipping WAV segment with mismatched format %s (expected %s)",
+                        seg_params[:3], params[:3],
+                    )
+                    continue
                 all_frames += wf.readframes(wf.getnframes())
         except Exception as e:
             logger.warning(f"Could not read WAV segment: {e}")

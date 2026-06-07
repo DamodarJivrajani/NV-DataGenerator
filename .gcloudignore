@@ -1,0 +1,47 @@
+# .gcloudignore — controls what `gcloud builds submit` uploads as the build source.
+# Keep this lean: a bloated source tarball slows every build and can leak secrets.
+# NOTE: this file does NOT auto-inherit .gitignore (that only happens when this
+# file is absent), so everything we want excluded must be listed explicitly.
+
+# Version control / CI metadata
+.git/
+.github/
+.gitignore
+
+# Python virtualenvs, caches, and local DB state
+backend/venv/
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.db-shm
+*.db-wal
+backend/jobs.db
+
+# Node dependencies and build output (rebuilt inside the image)
+frontend/node_modules/
+frontend/dist/
+dist/
+
+# Secrets — never ship local env files into the build context.
+# (We intentionally KEEP frontend/.env.production: the Vite build reads it to
+#  bake VITE_API_URL=/api/v1, and .env.example files are harmless templates.)
+backend/.env
+frontend/.env
+**/.env.local
+
+# Local tooling / editor / agent artifacts
+.playwright-mcp/
+.vscode/
+.idea/
+.claude/
+*.log
+
+# Screenshots and scratch images committed during development
+*.png
+*.jpg
+*.jpeg

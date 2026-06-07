@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/industries", tags=["industries"])
 
@@ -239,5 +239,5 @@ async def get_industry_scenarios(industry_id: str):
     for industry in INDUSTRIES:
         if industry["id"] == industry_id:
             return industry["scenarios"]
-    return {"error": "Industry not found"}
+    raise HTTPException(status_code=404, detail="Industry not found")
 

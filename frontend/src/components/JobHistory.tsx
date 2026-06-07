@@ -8,7 +8,13 @@ export function JobHistory() {
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['jobs'],
     queryFn: api.listJobs,
-    refetchInterval: 5000,
+    // Only poll while something is actually in progress; otherwise stop so we
+    // don't hammer /jobs forever on an idle, open tab.
+    refetchInterval: (query) => {
+      const data = query.state.data as GenerationJob[] | undefined
+      const active = data?.some((j) => j.status === 'running' || j.status === 'pending')
+      return active ? 5000 : false
+    },
   })
 
   if (isLoading) {

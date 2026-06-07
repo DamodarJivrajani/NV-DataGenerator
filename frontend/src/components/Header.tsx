@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Sparkles, Settings } from 'lucide-react'
 import { SettingsModal } from './SettingsModal'
+import { API_URL } from '@/services/api'
+
+// API docs live at the backend origin (strip the /api/v1 path segment).
+const DOCS_URL = `${API_URL.replace(/\/api\/v1\/?$/, '')}/docs`
 
 export function Header() {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -28,7 +32,7 @@ export function Header() {
               <span className="hidden md:inline">Settings</span>
             </button>
             <a href="#" className="text-gray-400 hover:text-white transition-colors">Docs</a>
-            <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">API</a>
+            <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">API</a>
             <a
               href="https://build.nvidia.com/nemo/data-designer"
               target="_blank"

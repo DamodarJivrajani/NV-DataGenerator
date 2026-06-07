@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from typing import Any
 
 from app.models.transcript import QualityScores
@@ -82,15 +83,18 @@ class QualityScorer:
                 model="meta/llama-3.1-8b-instruct",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=100,
+                max_tokens=200,
             )
 
             raw = response.choices[0].message.content.strip()
-            # Extract JSON if wrapped in markdown
-            if "```" in raw:
-                raw = raw.split("```")[1].replace("json", "").strip()
+            # Extract the first JSON object regardless of markdown fences or
+            # surrounding prose. The previous split("```") approach broke on
+            # uppercase ```JSON fences and silently fell back to neutral scores.
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if not match:
+                raise ValueError(f"No JSON object found in model output: {raw[:200]!r}")
 
-            scores = json.loads(raw)
+            scores = json.loads(match.group(0))
             coherence = float(scores.get("coherence", 7.0))
             diversity = float(scores.get("diversity", 7.0))
             factual = float(scores.get("factualConsistency", 7.0))

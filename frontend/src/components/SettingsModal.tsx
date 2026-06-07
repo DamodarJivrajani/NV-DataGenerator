@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Key, CheckCircle, XCircle, Loader2, Eye, EyeOff, Save } from 'lucide-react'
 import { clsx } from 'clsx'
+import { API_URL } from '@/services/api'
 
 interface SettingsModalProps {
     isOpen: boolean
@@ -16,34 +17,50 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [statusMessage, setStatusMessage] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [saved, setSaved] = useState(false)
+    // Cancel any in-flight request when the modal closes/unmounts so we never
+    // setState on an unmounted component.
+    const abortRef = useRef<AbortController | null>(null)
 
-    // Load saved API key on mount
     useEffect(() => {
-        const savedKey = localStorage.getItem('nvidia_api_key') || ''
-        if (savedKey) {
-            setApiKey(savedKey)
+        return () => abortRef.current?.abort()
+    }, [])
+
+    // Clear the entered key from memory whenever the modal closes. The key is
+    // never persisted to localStorage — it is held only by the backend session.
+    useEffect(() => {
+        if (!isOpen) {
+            abortRef.current?.abort()
+            setApiKey('')
+            setStatus('idle')
+            setStatusMessage('')
+            setSaved(false)
         }
     }, [isOpen])
 
     const handleSave = async () => {
         setIsSaving(true)
+        abortRef.current?.abort()
+        abortRef.current = new AbortController()
         try {
-            // Save to localStorage
-            localStorage.setItem('nvidia_api_key', apiKey)
-
-            // Also send to backend to update the session
-            const response = await fetch('http://localhost:8000/api/v1/settings/api-key', {
+            const response = await fetch(`${API_URL}/settings/api-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ api_key: apiKey }),
+                signal: abortRef.current.signal,
             })
 
             if (response.ok) {
                 setSaved(true)
                 setTimeout(() => setSaved(false), 2000)
+            } else {
+                const data = await response.json().catch(() => ({}))
+                setStatus('invalid')
+                setStatusMessage(data.detail || 'Failed to save API key')
             }
         } catch (error) {
-            console.error('Failed to save API key:', error)
+            if ((error as Error).name === 'AbortError') return
+            setStatus('invalid')
+            setStatusMessage('Failed to connect to backend server')
         } finally {
             setIsSaving(false)
         }
@@ -52,12 +69,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const handleTest = async () => {
         setStatus('testing')
         setStatusMessage('Testing API connection...')
+        abortRef.current?.abort()
+        abortRef.current = new AbortController()
 
         try {
-            const response = await fetch('http://localhost:8000/api/v1/settings/test-api', {
+            const response = await fetch(`${API_URL}/settings/test-api`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ api_key: apiKey }),
+                signal: abortRef.current.signal,
             })
 
             const data = await response.json()
@@ -70,6 +90,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 setStatusMessage(data.message || 'API key is invalid')
             }
         } catch (error) {
+            if ((error as Error).name === 'AbortError') return
             setStatus('invalid')
             setStatusMessage('Failed to connect to backend server')
         }

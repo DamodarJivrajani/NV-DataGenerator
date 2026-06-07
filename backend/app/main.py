@@ -16,11 +16,24 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS for frontend
+# CORS for frontend.
+# A wildcard origin together with allow_credentials=True is rejected by browsers
+# and is a latent misconfiguration, so we never combine them. Set ALLOWED_ORIGINS
+# (comma-separated) to pin the frontend origin in production; otherwise we fall
+# back to a wildcard with credentials disabled, which is correct for this
+# session-less public API.
+_origins_env = os.environ.get("ALLOWED_ORIGINS", "").strip()
+if _origins_env:
+    allowed_origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
+    allow_credentials = True
+else:
+    allowed_origins = ["*"]
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -2,10 +2,19 @@
 
 import json
 import logging
+import re
 import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# HF tokens look like "hf_xxxx". Strip any that leak into library exception
+# strings before they reach logs or HTTP responses.
+_HF_TOKEN_RE = re.compile(r"hf_[A-Za-z0-9]{4,}")
+
+
+def _sanitize(msg: object) -> str:
+    return _HF_TOKEN_RE.sub("hf_***", str(msg))
 
 
 class HFUploader:
@@ -50,7 +59,8 @@ class HFUploader:
         try:
             api.create_repo(repo_id=repo_name, repo_type="dataset", private=private, exist_ok=True)
         except Exception as e:
-            raise RuntimeError(f"Failed to create repository: {e}")
+            logger.error("HF create_repo failed: %s", _sanitize(e))
+            raise RuntimeError("Failed to create repository. Check your token's write permissions and the repo name.")
 
         files_uploaded = []
 
@@ -94,12 +104,16 @@ class HFUploader:
                 CommitOperationAdd(path_in_repo="README.md", path_or_fileobj=str(readme_file)),
             ]
 
-            api.create_commit(
-                repo_id=repo_name,
-                repo_type="dataset",
-                operations=operations,
-                commit_message=f"Add synthetic contact center dataset (job {job_id[:8]})",
-            )
+            try:
+                api.create_commit(
+                    repo_id=repo_name,
+                    repo_type="dataset",
+                    operations=operations,
+                    commit_message=f"Add synthetic contact center dataset (job {job_id[:8]})",
+                )
+            except Exception as e:
+                logger.error("HF create_commit failed: %s", _sanitize(e))
+                raise RuntimeError("Failed to upload dataset files to the repository.")
 
             files_uploaded = [hf_data_path, "README.md"]
 

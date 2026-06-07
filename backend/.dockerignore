@@ -1,0 +1,24 @@
+# Secrets and local state must never be baked into the image.
+.env
+.env.*
+!.env.example
+*.db
+jobs.db
+
+# Python virtualenvs and caches
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated artifacts and outputs
+artifacts/
+
+# VCS / editor noise
+.git/
+.gitignore
+*.md

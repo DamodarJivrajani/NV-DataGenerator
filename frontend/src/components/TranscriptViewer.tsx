@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -51,6 +51,12 @@ export function TranscriptViewer() {
     speech.stop()
     setPlayingId(null)
   }
+
+  // Clear the highlighted call when playback ends on its own (not just via Stop),
+  // so playingId doesn't drift out of sync with the actual speech state.
+  useEffect(() => {
+    if (!speech.isPlaying) setPlayingId(null)
+  }, [speech.isPlaying])
 
   return (
     <div className="min-h-screen bg-gray-950">

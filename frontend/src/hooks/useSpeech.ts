@@ -93,16 +93,24 @@ export function useSpeech(): UseSpeechResult {
   }, [])
 
   const play = useCallback((turns: ConversationTurn[]) => {
-    if (!isSupported || turns.length === 0) return
+    if (!isSupported) return
+    // Speak only non-empty turns, but keep each turn's ORIGINAL index so the UI
+    // highlight stays aligned. onend must be attached to the last spoken turn —
+    // attaching it to turns[length-1] left isPlaying stuck true forever whenever
+    // the final turn had empty text (it was skipped, so its onend never fired).
+    const speakable = turns
+      .map((turn, idx) => ({ turn, idx }))
+      .filter(({ turn }) => turn.text.trim())
+    if (speakable.length === 0) return
+
     window.speechSynthesis.cancel()
     setIsPlaying(true)
     setIsPaused(false)
 
-    turns.forEach((turn, idx) => {
-      if (!turn.text.trim()) return
+    speakable.forEach(({ turn, idx }, i) => {
       const u = buildUtterance(turn)
       u.onstart = () => setCurrentIndex(idx)
-      if (idx === turns.length - 1) {
+      if (i === speakable.length - 1) {
         u.onend = () => {
           setIsPlaying(false)
           setIsPaused(false)

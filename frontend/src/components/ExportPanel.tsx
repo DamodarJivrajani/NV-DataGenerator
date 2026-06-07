@@ -50,21 +50,30 @@ export function ExportPanel() {
     },
   })
 
+  // Track which format is currently downloading so only that button spins,
+  // instead of disabling every download button at once.
+  const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null)
+
   const downloadMutation = useMutation({
     mutationFn: ({ jobId, format }: { jobId: string; format: string }) =>
       api.downloadJob(jobId, format as 'json'),
+    onMutate: ({ format }) => setDownloadingFormat(format),
     onSuccess: (blob, { format }) => {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       // Map each export format to its real file extension. The blob object-URL
       // overrides the server's Content-Disposition, so this must be correct.
-      const EXT: Record<string, string> = { csv: 'csv', json: 'json', audio: 'zip' }
+      const EXT: Record<string, string> = {
+        csv: 'csv', json: 'json', jsonl: 'jsonl', audio: 'zip',
+        sft: 'jsonl', sft_instruct: 'jsonl', dpo: 'jsonl', curated: 'jsonl',
+      }
       const ext = EXT[format] ?? 'jsonl'
       a.download = `transcripts_${format}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
     },
+    onSettled: () => setDownloadingFormat(null),
   })
 
   const scoreMutation = useMutation({
@@ -202,7 +211,7 @@ export function ExportPanel() {
                       label={fmt.toUpperCase()}
                       icon={fmt === 'csv' ? <Table className="w-5 h-5" /> : <FileJson className="w-5 h-5" />}
                       onClick={() => downloadMutation.mutate({ jobId: job.id, format: fmt })}
-                      isLoading={downloadMutation.isPending}
+                      isLoading={downloadingFormat === fmt}
                     />
                   ))}
                 </div>
@@ -216,14 +225,14 @@ export function ExportPanel() {
                     label="SFT Format"
                     icon={<FileText className="w-5 h-5" />}
                     onClick={() => downloadMutation.mutate({ jobId: job.id, format: 'sft' })}
-                    isLoading={downloadMutation.isPending}
+                    isLoading={downloadingFormat === 'sft'}
                     description="{prompt, response}"
                   />
                   <DownloadButton
                     label="SFT Instruct"
                     icon={<FileText className="w-5 h-5" />}
                     onClick={() => downloadMutation.mutate({ jobId: job.id, format: 'sft_instruct' })}
-                    isLoading={downloadMutation.isPending}
+                    isLoading={downloadingFormat === 'sft_instruct'}
                     description="{messages: [...]}"
                   />
                   <div className="col-span-2">
@@ -245,7 +254,7 @@ export function ExportPanel() {
                           label="Download DPO"
                           icon={<Download className="w-4 h-4" />}
                           onClick={() => downloadMutation.mutate({ jobId: job.id, format: 'dpo' })}
-                          isLoading={downloadMutation.isPending}
+                          isLoading={downloadingFormat === 'dpo'}
                         />
                       </div>
                     )}
@@ -329,7 +338,7 @@ export function ExportPanel() {
                       label="Download Curated"
                       icon={<Download className="w-4 h-4" />}
                       onClick={() => downloadMutation.mutate({ jobId: job.id, format: 'curated' })}
-                      isLoading={downloadMutation.isPending}
+                      isLoading={downloadingFormat === 'curated'}
                     />
                   </div>
                 )}
@@ -399,7 +408,7 @@ export function ExportPanel() {
                       label="Download Audio ZIP"
                       icon={<Download className="w-4 h-4" />}
                       onClick={() => downloadMutation.mutate({ jobId: job.id, format: 'audio' })}
-                      isLoading={downloadMutation.isPending}
+                      isLoading={downloadingFormat === 'audio'}
                     />
                   </div>
                 )}

@@ -1,6 +1,7 @@
 """NeMo Curator-inspired data curation: dedup, PII filtering, quality filtering."""
 
 import re
+import copy
 import logging
 import json
 from pathlib import Path
@@ -71,6 +72,11 @@ class NemoCurator:
         original_count = len(transcripts)
         pii_removed_count = 0
         quality_filtered_count = 0
+
+        # Deep-copy up front: the PII step mutates turn["text"] in place. Without
+        # this, the caller's stored transcripts get silently redacted, so the
+        # curated file on disk and the data returned by /download would diverge.
+        transcripts = copy.deepcopy(transcripts)
 
         # Step 1: Quality filtering
         if min_quality_score > 0:

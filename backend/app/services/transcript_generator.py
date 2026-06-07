@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -413,7 +414,11 @@ Return a JSON object with:
         num_records = min(config.num_records, 5)  # Limit preview to 5
 
         try:
-            preview = self.data_designer.preview(builder, num_records=num_records)
+            # data_designer.preview makes blocking network calls; run it off the
+            # event loop so it doesn't freeze other requests (e.g. status polling).
+            preview = await asyncio.to_thread(
+                self.data_designer.preview, builder, num_records=num_records
+            )
             df = preview.dataset
 
             transcripts = []
@@ -430,12 +435,15 @@ Return a JSON object with:
         builder = self._build_config(config)
 
         try:
-            results = self.data_designer.create(
+            # data_designer.create is a long, blocking call — keep it off the
+            # event loop so the async background task doesn't stall the server.
+            results = await asyncio.to_thread(
+                self.data_designer.create,
                 builder,
                 num_records=config.num_records,
                 dataset_name=f"transcripts_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             )
-            df = results.load_dataset()
+            df = await asyncio.to_thread(results.load_dataset)
 
             transcripts = []
             for _, row in df.iterrows():

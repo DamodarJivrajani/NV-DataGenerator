@@ -2,6 +2,7 @@ import json
 import csv
 import io
 import logging
+import uuid
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
@@ -13,6 +14,38 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+def _validate_job_id(job_id: str) -> None:
+    """Reject anything that isn't a real UUID before it is used to build a file
+    path, so a crafted job_id can't escape the artifacts directory."""
+    try:
+        uuid.UUID(job_id)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid job id")
+
+
+def _write_background_error(artifact_path: Path, job_id: str, kind: str, exc: Exception) -> None:
+    """Persist a background task's failure so the download endpoint can report it."""
+    try:
+        artifact_path.mkdir(parents=True, exist_ok=True)
+        (artifact_path / f"{job_id}_{kind}.error").write_text(str(exc)[:1000], encoding="utf-8")
+    except OSError:
+        logger.exception("Could not write %s error marker for job %s", kind, job_id)
+
+
+def _raise_for_background_error(artifact_path: Path, job_id: str, kind: str, not_ready_msg: str) -> None:
+    """A background task (dpo/audio) writes a `{job_id}_{kind}.error` sidecar when
+    it fails. Surface that as a 500 so the failure is visible instead of looking
+    like the job simply hasn't finished (404)."""
+    err_path = artifact_path / f"{job_id}_{kind}.error"
+    if err_path.exists():
+        try:
+            detail = err_path.read_text(encoding="utf-8")[:300]
+        except OSError:
+            detail = "unknown error"
+        raise HTTPException(status_code=500, detail=f"{kind.upper()} generation failed: {detail}")
+    raise HTTPException(status_code=404, detail=not_ready_msg)
 
 
 @router.get("")
@@ -41,7 +74,15 @@ async def get_job_results(job_id: str):
     """
     transcripts = job_store.get_results(job_id)
     if not transcripts:
-        raise HTTPException(status_code=404, detail="Transcripts not available for this job yet")
+        # Distinguish "no such job" (404) from "job exists but results aren't
+        # ready yet" (409) so the client can tell the two apart.
+        job = job_store.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Transcripts not ready yet (job status: {job.status})",
+        )
     return {"transcripts": transcripts}
 
 
@@ -56,6 +97,7 @@ async def delete_job(job_id: str):
 @router.get("/{job_id}/download")
 async def download_job(job_id: str, format: str = "json"):
     """Download generated transcripts in various formats."""
+    _validate_job_id(job_id)
     settings = get_settings()
 
     if format == "curated":
@@ -71,7 +113,8 @@ async def download_job(job_id: str, format: str = "json"):
     if format == "audio":
         audio_zip = settings.artifact_path / f"{job_id}_audio.zip"
         if not audio_zip.exists():
-            raise HTTPException(status_code=404, detail="Audio not generated yet. Run /generate-audio first.")
+            _raise_for_background_error(settings.artifact_path, job_id, "audio",
+                                        "Audio not generated yet. Run /generate-audio first.")
         return FileResponse(
             str(audio_zip),
             media_type="application/zip",
@@ -81,7 +124,8 @@ async def download_job(job_id: str, format: str = "json"):
     if format == "dpo":
         dpo_path = settings.artifact_path / f"{job_id}_dpo.jsonl"
         if not dpo_path.exists():
-            raise HTTPException(status_code=404, detail="DPO dataset not found. Run /generate-dpo first.")
+            _raise_for_background_error(settings.artifact_path, job_id, "dpo",
+                                        "DPO dataset not found. Run /generate-dpo first.")
         return FileResponse(
             str(dpo_path),
             media_type="application/x-ndjson",
@@ -113,25 +157,28 @@ async def download_job(job_id: str, format: str = "json"):
             flat_records = []
             for t in transcripts:
                 qs = t.get("qualityScores") or {}
+                customer = t.get("customer") or {}
+                agent = t.get("agent") or {}
+                metadata = t.get("metadata") or {}
                 flat = {
-                    "id": t["id"],
-                    "industry": t["industry"],
-                    "scenario": t["scenario"],
+                    "id": t.get("id", ""),
+                    "industry": t.get("industry", ""),
+                    "scenario": t.get("scenario", ""),
                     "language": t.get("language", "english"),
-                    "callType": t["callType"],
-                    "customerName": t["customer"]["name"],
-                    "customerAge": t["customer"]["age"],
-                    "customerSentiment": t["customer"]["sentiment"],
-                    "agentName": t["agent"]["name"],
-                    "agentExperience": t["agent"]["experienceLevel"],
-                    "conversationTurns": len(t["conversation"]),
-                    "durationSeconds": t["metadata"]["durationSeconds"],
-                    "resolutionStatus": t["metadata"]["resolutionStatus"],
-                    "csatScore": t["metadata"]["csatScore"],
+                    "callType": t.get("callType", ""),
+                    "customerName": customer.get("name", ""),
+                    "customerAge": customer.get("age", ""),
+                    "customerSentiment": customer.get("sentiment", ""),
+                    "agentName": agent.get("name", ""),
+                    "agentExperience": agent.get("experienceLevel", ""),
+                    "conversationTurns": len(t.get("conversation") or []),
+                    "durationSeconds": metadata.get("durationSeconds", ""),
+                    "resolutionStatus": metadata.get("resolutionStatus", ""),
+                    "csatScore": metadata.get("csatScore", ""),
                     "qualityOverall": qs.get("overall", ""),
                     "qualityCoherence": qs.get("coherence", ""),
                     "qualityDiversity": qs.get("diversity", ""),
-                    "createdAt": t["createdAt"],
+                    "createdAt": t.get("createdAt", ""),
                 }
                 flat_records.append(flat)
 
@@ -246,6 +293,7 @@ class CurateRequest(BaseModel):
 @router.post("/{job_id}/curate")
 def curate_job(job_id: str, request: CurateRequest):
     """Run NeMo Curator-inspired curation pipeline on job transcripts."""
+    _validate_job_id(job_id)
     transcripts = job_store.get_results(job_id)
     if not transcripts:
         raise HTTPException(status_code=404, detail="Job results not found")
@@ -340,14 +388,19 @@ def _generate_dpo_background(job_id: str, transcripts: list[dict], api_key: str,
             for record in dpo_records:
                 f.write(json.dumps(record) + "\n")
 
+        # Clear any stale failure marker from a previous attempt.
+        err_path = artifact_path / f"{job_id}_dpo.error"
+        err_path.unlink(missing_ok=True)
         logger.info(f"DPO dataset saved: {out_path} ({len(dpo_records)} records)")
     except Exception as e:
         logger.error(f"DPO generation background task failed: {e}")
+        _write_background_error(artifact_path, job_id, "dpo", e)
 
 
 @router.post("/{job_id}/generate-dpo")
 async def generate_dpo(job_id: str, background_tasks: BackgroundTasks):
     """Generate DPO (chosen/rejected) dataset for a completed job."""
+    _validate_job_id(job_id)
     transcripts = job_store.get_results(job_id)
     if not transcripts:
         raise HTTPException(status_code=404, detail="Job results not found")
@@ -414,14 +467,17 @@ def _generate_audio_background(job_id: str, transcripts: list[dict], riva_endpoi
         from app.services.audio_generator import AudioGenerator
         generator = AudioGenerator(riva_endpoint=riva_endpoint)
         generator.generate_batch_audio(transcripts, artifacts_dir=artifact_path, job_id=job_id)
+        (artifact_path / f"{job_id}_audio.error").unlink(missing_ok=True)
         logger.info(f"Audio generation complete for job {job_id}")
     except Exception as e:
         logger.error(f"Audio generation background task failed: {e}")
+        _write_background_error(artifact_path, job_id, "audio", e)
 
 
 @router.post("/{job_id}/generate-audio")
 async def generate_audio(job_id: str, background_tasks: BackgroundTasks):
     """Generate audio files for all transcripts in a job (async)."""
+    _validate_job_id(job_id)
     transcripts = job_store.get_results(job_id)
     if not transcripts:
         raise HTTPException(status_code=404, detail="Job results not found")

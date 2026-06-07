@@ -89,8 +89,9 @@ export const useConfigStore = create<ConfigState>((set) => ({
       config: { ...state.config, language },
     })),
 
-  setStep: (step) => set({ step }),
-  nextStep: () => set((state) => ({ step: state.step + 1 })),
+  setStep: (step) => set({ step: Math.min(4, Math.max(0, step)) }),
+  // 5 wizard steps (0..4); clamp so we never render the fall-through default.
+  nextStep: () => set((state) => ({ step: Math.min(4, state.step + 1) })),
   prevStep: () => set((state) => ({ step: Math.max(0, state.step - 1) })),
   reset: () => set({ config: defaultConfig, step: 0 }),
 }))

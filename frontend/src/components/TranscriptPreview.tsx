@@ -198,7 +198,7 @@ function TranscriptCard({ transcript, isExpanded, onToggle }: TranscriptCardProp
             <div className="flex gap-4 text-xs text-gray-400 pt-2 border-t border-gray-700">
               <span>Duration: {Math.floor(transcript.metadata.durationSeconds / 60)}m {transcript.metadata.durationSeconds % 60}s</span>
               <span>Status: {transcript.metadata.resolutionStatus}</span>
-              {transcript.metadata.csatScore && <span>CSAT: {transcript.metadata.csatScore}/5</span>}
+              {transcript.metadata.csatScore != null && <span>CSAT: {transcript.metadata.csatScore}/5</span>}
             </div>
           )}
         </div>

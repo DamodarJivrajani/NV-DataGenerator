@@ -49,12 +49,15 @@ def _check_safety(text: str) -> list[str]:
 
 
 def _name_origin_label(name: str) -> str:
-    name_lower = name.lower()
-    if any(n in name_lower for n in ASIAN_NAMES):
+    # Match on whole name tokens, not substrings. Substring matching wrongly
+    # classifies e.g. "linda" as asian (contains "li") or "diana" as hispanic
+    # (contains "ana"), which made the diversity score meaningless.
+    tokens = set(re.findall(r"[a-z]+", name.lower()))
+    if tokens & ASIAN_NAMES:
         return "asian"
-    if any(n in name_lower for n in HISPANIC_NAMES):
+    if tokens & HISPANIC_NAMES:
         return "hispanic"
-    if any(n in name_lower for n in AFRICAN_NAMES):
+    if tokens & AFRICAN_NAMES:
         return "african"
     return "western"
 

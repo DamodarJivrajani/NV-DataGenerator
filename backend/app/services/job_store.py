@@ -19,10 +19,17 @@ class JobStore:
     
     @contextmanager
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path)
+        # timeout lets writers wait out a lock instead of failing immediately;
+        # WAL allows readers and a writer to coexist. Roll back on any error so a
+        # half-applied write is never left behind.
+        conn = sqlite3.connect(self.db_path, timeout=10)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
         try:
             yield conn
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
     

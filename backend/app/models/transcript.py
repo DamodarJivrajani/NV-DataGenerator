@@ -1,7 +1,13 @@
+import re
 from datetime import datetime
 from typing import Literal, Optional
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+# Scenario ids are slugs (e.g. "appointment", "card_dispute"). Constraining to
+# this shape — rather than to a registry that could drift from the frontend —
+# blocks free-text being interpolated into the generation prompt (injection).
+_SCENARIO_RE = re.compile(r"^[a-z0-9_]+$")
 
 Sentiment = Literal["frustrated", "neutral", "satisfied", "angry", "confused"]
 CallType = Literal["inbound", "outbound"]
@@ -125,41 +131,35 @@ class GenerationConfig(BaseModel):
     call_types: list[CallType] = Field(alias="callTypes", default=["inbound"])
     sentiments: list[Sentiment] = Field(default=["neutral", "frustrated", "satisfied"])
     num_records: int = Field(alias="numRecords", default=10, ge=1, le=1000)
-    min_turns: int = Field(alias="minTurns", default=4, ge=2)
-    max_turns: int = Field(alias="maxTurns", default=12, le=30)
+    min_turns: int = Field(alias="minTurns", default=4, ge=2, le=30)
+    max_turns: int = Field(alias="maxTurns", default=12, ge=2, le=30)
     include_metadata: bool = Field(alias="includeMetadata", default=True)
     language: Language = "english"
 
     class Config:
         populate_by_name = True
 
-
-JobStatus = Literal["pending", "running", "completed", "failed"]
-
-
-class GenerationJob(BaseModel):
-    id: str
-    status: JobStatus = "pending"
-    config: GenerationConfig
-    progress: float = 0.0
-    total_records: int = Field(alias="totalRecords")
-    completed_records: int = Field(alias="completedRecords", default=0)
-    created_at: str = Field(alias="createdAt")
-    completed_at: Optional[str] = Field(alias="completedAt", default=None)
-    error: Optional[str] = None
-    transcripts: list[Transcript] = Field(default_factory=list)
-
-    class Config:
-        populate_by_name = True
-
+    @field_validator("scenarios")
     @classmethod
-    def create(cls, config: GenerationConfig) -> "GenerationJob":
-        """Factory method to create a new job from config."""
-        return cls(
-            id=str(uuid4()),
-            config=config,
-            totalRecords=config.num_records,
-            createdAt=datetime.utcnow().isoformat() + "Z",
-        )
+    def _check_scenarios(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("At least one scenario is required")
+        if len(v) > 50:
+            raise ValueError("Too many scenarios (max 50)")
+        for s in v:
+            if not _SCENARIO_RE.fullmatch(s):
+                raise ValueError(f"Invalid scenario id: {s!r}")
+        return v
+
+    @model_validator(mode="after")
+    def _check_turn_range(self) -> "GenerationConfig":
+        if self.min_turns > self.max_turns:
+            raise ValueError("minTurns must be less than or equal to maxTurns")
+        return self
+
+
+# NOTE: GenerationJob and JobStatus live in app.models.job (the package re-exports
+# those). They were previously duplicated here, which risked two divergent schemas
+# being imported from different modules.
 
 

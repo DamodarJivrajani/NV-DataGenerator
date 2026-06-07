@@ -4,6 +4,8 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.config import get_settings
+
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 # In-memory storage for current session (use Redis/DB in production)
@@ -21,13 +23,35 @@ class ApiKeyResponse(BaseModel):
 
 @router.post("/api-key")
 async def save_api_key(request: ApiKeyRequest):
-    """Save API key for the current session."""
+    """Save the NVIDIA API key for the current process/session.
+
+    This mutates the process-wide environment so the NeMo SDK can read it. On a
+    public deployment that is a footgun (any caller can change the key every
+    other request uses), so set DISABLE_RUNTIME_API_KEY=1 to force the key to be
+    supplied only via the environment / secret manager.
+    """
+    if os.environ.get("DISABLE_RUNTIME_API_KEY", "").lower() in ("1", "true", "yes"):
+        raise HTTPException(
+            status_code=403,
+            detail="Runtime API key updates are disabled. Configure NVIDIA_API_KEY in the environment.",
+        )
+
+    key = request.api_key.strip()
+    if not key.startswith("nvapi-"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid API key format. NVIDIA keys start with 'nvapi-'.",
+        )
+
     global _current_api_key
-    _current_api_key = request.api_key
-    
-    # Also set as environment variable for NeMo SDK
-    os.environ["NVIDIA_API_KEY"] = request.api_key
-    
+    _current_api_key = key
+
+    # Also set as environment variable for the NeMo SDK, and invalidate the
+    # cached Settings so endpoints reading get_settings().nvidia_api_key (scoring,
+    # DPO) immediately see the new key instead of the stale cached value.
+    os.environ["NVIDIA_API_KEY"] = key
+    get_settings.cache_clear()
+
     return {"success": True, "message": "API key saved for this session"}
 
 

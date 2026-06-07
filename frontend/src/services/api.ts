@@ -1,6 +1,6 @@
 import type { GenerationConfig, GenerationJob, Transcript, BiasReport, DatasetStats, CurationResult } from '@/types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${endpoint}`, {

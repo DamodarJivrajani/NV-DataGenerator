@@ -6,6 +6,8 @@ Generate realistic synthetic contact center transcripts using NVIDIA NeMo Data D
 ![Python](https://img.shields.io/badge/Python-3.10+-green.svg)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)
+[![CI](https://github.com/Yash-Kavaiya/NV-DataGenerator/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash-Kavaiya/NV-DataGenerator/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Yash-Kavaiya/NV-DataGenerator/actions/workflows/deploy.yml/badge.svg)](https://github.com/Yash-Kavaiya/NV-DataGenerator/actions/workflows/deploy.yml)
 
 ## 🌐 Live Demo
 
@@ -397,6 +399,29 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 |----------|----------|-------------|
 | `NVIDIA_API_KEY` | Yes | API key from build.nvidia.com |
 | `ARTIFACT_PATH` | No | Path for generated artifacts (default: ./artifacts) |
+
+## 🚢 Deployment (CI/CD)
+
+Continuous delivery is wired up end-to-end:
+
+```
+push to main ─▶ GitHub Actions ─▶ Cloud Build ─▶ Artifact Registry ─▶ Cloud Run
+                 (keyless auth via Workload Identity Federation)
+```
+
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) runs on every PR: frontend typecheck + build, backend import smoke test, and Docker builds for both services.
+- **CD** ([`deploy.yml`](.github/workflows/deploy.yml)) runs on push to `main`: authenticates to GCP with Workload Identity Federation (no service-account keys), then [`cloudbuild.yaml`](cloudbuild.yaml) builds, pushes, and deploys the backend and frontend to Cloud Run — injecting the backend URL into the frontend and smoke-testing `/api/v1/health` before going green.
+
+**First-time setup** is one command plus pasting a few GitHub variables:
+
+```powershell
+./scripts/setup-gcp.ps1     # Windows
+```
+```bash
+./scripts/setup-gcp.sh      # Linux / macOS / Cloud Shell
+```
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for the full guide (identity model, variables, rollback, key rotation, and troubleshooting).
 
 ## 🤝 Contributing
 

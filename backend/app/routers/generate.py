@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models import GenerationConfig, GenerationJob
 from app.services import TranscriptGenerator
 from app.services.job_store import job_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
@@ -41,9 +44,14 @@ async def run_batch_generation(job_id: str, config: GenerationConfig):
         job.completed_at = datetime.utcnow().isoformat() + "Z"
         job_store.update_job(job)
     except Exception as e:
+        # Best-effort: never let a failure to persist the "failed" status leave
+        # the job wedged in "running" forever.
         job.status = "failed"
         job.error = str(e)
-        job_store.update_job(job)
+        try:
+            job_store.update_job(job)
+        except Exception:
+            logger.exception("Failed to mark job %s as failed", job_id)
 
 
 @router.post("/batch")
