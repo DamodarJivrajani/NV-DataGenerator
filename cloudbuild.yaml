@@ -152,6 +152,7 @@ steps:
           --platform=managed \
           --port=8080 \
           --allow-unauthenticated \
+          --service-account=${_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com \
           --set-env-vars=BACKEND_URL=$$BACKEND_URL \
           --memory=${_FRONTEND_MEMORY} \
           --cpu=${_FRONTEND_CPU} \
