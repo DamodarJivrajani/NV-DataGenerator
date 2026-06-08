@@ -13,9 +13,9 @@ Generate realistic synthetic contact center transcripts using NVIDIA NeMo Data D
 
 > **Try it now!** The application is deployed on Google Cloud Run:
 >
-> - **Frontend:** [https://nv-data-generator-frontend-c2lqvh37bq-uc.a.run.app](https://nv-data-generator-frontend-c2lqvh37bq-uc.a.run.app)
-> - **Backend API:** [https://nv-data-generator-backend-c2lqvh37bq-uc.a.run.app](https://nv-data-generator-backend-c2lqvh37bq-uc.a.run.app)
-> - **API Docs:** [https://nv-data-generator-backend-c2lqvh37bq-uc.a.run.app/docs](https://nv-data-generator-backend-c2lqvh37bq-uc.a.run.app/docs)
+> - **Frontend:** [https://nv-data-generator-frontend-awghszkm2a-uc.a.run.app](https://nv-data-generator-frontend-awghszkm2a-uc.a.run.app)
+> - **Backend API:** [https://nv-data-generator-backend-awghszkm2a-uc.a.run.app](https://nv-data-generator-backend-awghszkm2a-uc.a.run.app)
+> - **API Docs:** [https://nv-data-generator-backend-awghszkm2a-uc.a.run.app/docs](https://nv-data-generator-backend-awghszkm2a-uc.a.run.app/docs)
 
 
 ## 🎯 Overview
