@@ -184,6 +184,14 @@ steps:
         if [ "$$ok" != "1" ]; then echo "Backend health check FAILED"; exit 1; fi
         echo "Backend healthy."
         curl -fsS -o /dev/null "$$FRONTEND_URL" && echo "Frontend reachable." || { echo "Frontend check FAILED"; exit 1; }
+        echo "Proxy check: $$FRONTEND_URL/api/v1/health (frontend nginx -> backend)"
+        pok=0
+        for i in $$(seq 1 12); do
+          if curl -fsS "$$FRONTEND_URL/api/v1/health" >/dev/null 2>&1; then pok=1; break; fi
+          echo "  attempt $$i: proxy not ready, retrying in 5s..."; sleep 5
+        done
+        if [ "$$pok" != "1" ]; then echo "Frontend->backend proxy check FAILED"; exit 1; fi
+        echo "Proxy healthy."
         echo ""
         echo "==================== Deployment summary ===================="
         echo "  Commit:   ${_TAG}"
